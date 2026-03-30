@@ -7,6 +7,9 @@ type TodoContextType = {
   deleteTodo: (id: string) => Promise<void>;
   toggleTodo: (todo: Todo) => Promise<void>;
   updateTodo: (id: string, title: string) => Promise<void>;
+  verifyChain: () => Promise<void>;
+  chainValid: boolean;
+  chainMessage: string;
   activeCount: number;
   canAddMore: boolean;
   warningMessage: string;
@@ -20,15 +23,41 @@ const SHADOW_ARCHIVE_DELAY = 15000;
 
 export function TodoProvider({ children }: { children: ReactNode }) {
   const [todos, setTodos] = useState<Todo[]>([]);
+  const [chainValid, setChainValid] = useState(true);
+  const [chainMessage, setChainMessage] = useState("");
   const [warningMessage, setWarningMessage] = useState("");
 
   const activeCount = todos.filter((t) => !t.completed).length;
   const canAddMore = activeCount < MAX_ACTIVE_TASKS;
 
+  const verifyChain = async () => {
+    try {
+      const res = await fetch(`${API_URL}/verify`);
+
+      if (res.ok) {
+        const data = await res.json();
+        setChainValid(true);
+        setChainMessage(data.message ?? "Chain valid");
+      } else {
+        const data = await res.json();
+        setChainValid(false);
+        setChainMessage(data.message ?? "Chain tampered");
+      }
+    } catch {
+      setChainValid(false);
+      setChainMessage("Unable to verify blockchain state.");
+    }
+  };
+
   const fetchTodos = async () => {
     const res = await fetch(API_URL);
     const data = await res.json();
     setTodos(data);
+  };
+
+  const refreshAll = async () => {
+    await fetchTodos();
+    await verifyChain();
   };
 
   const addTodo = async (title: string) => {
@@ -39,23 +68,19 @@ export function TodoProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const res = await fetch(API_URL, {
+    await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: title.trim(),
-        completed: false,
-      }),
+      body: JSON.stringify({ title: title.trim(), completed: false }),
     });
 
-    const created = await res.json();
-    setTodos((prev) => [...prev, created]);
     setWarningMessage("");
+    await refreshAll();
   };
 
   const deleteTodo = async (id: string) => {
     await fetch(`${API_URL}/${id}`, { method: "DELETE" });
-    setTodos((prev) => prev.filter((t) => t.id !== id));
+    await refreshAll();
   };
 
   const toggleTodo = async (todo: Todo) => {
@@ -68,19 +93,17 @@ export function TodoProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    const updated = { ...todo, completed: !todo.completed };
-
     await fetch(`${API_URL}/${todo.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updated),
+      body: JSON.stringify({
+        ...todo,
+        completed: !todo.completed,
+      }),
     });
 
-    setTodos((prev) =>
-      prev.map((t) => (t.id === todo.id ? updated : t))
-    );
-
     setWarningMessage("");
+    await refreshAll();
 
     if (!todo.completed) {
       window.setTimeout(async () => {
@@ -88,8 +111,7 @@ export function TodoProvider({ children }: { children: ReactNode }) {
           await fetch(`${API_URL}/${todo.id}`, {
             method: "DELETE",
           });
-
-          setTodos((prev) => prev.filter((t) => t.id !== todo.id));
+          await refreshAll();
         } catch (error) {
           console.error("Failed to archive completed todo:", error);
         }
@@ -101,24 +123,20 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     const existing = todos.find((t) => t.id === id);
     if (!existing || !title.trim()) return;
 
-    const updated = {
-      ...existing,
-      title: title.trim(),
-    };
-
     await fetch(`${API_URL}/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updated),
+      body: JSON.stringify({
+        ...existing,
+        title: title.trim(),
+      }),
     });
 
-    setTodos((prev) =>
-      prev.map((t) => (t.id === id ? updated : t))
-    );
+    await refreshAll();
   };
 
   useEffect(() => {
-    fetchTodos();
+    refreshAll();
   }, []);
 
   return (
@@ -129,6 +147,9 @@ export function TodoProvider({ children }: { children: ReactNode }) {
         deleteTodo,
         toggleTodo,
         updateTodo,
+        verifyChain,
+        chainValid,
+        chainMessage,
         activeCount,
         canAddMore,
         warningMessage,
