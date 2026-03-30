@@ -3,7 +3,7 @@ import { useTodos } from "../hooks/useTodos";
 
 export default function AddTodoForm() {
   const [title, setTitle] = useState("");
-  const { addTodo } = useTodos();
+  const { addTodo, canAddMore, activeCount } = useTodos();
 
   const handleAdd = async () => {
     if (!title.trim()) return;
@@ -17,8 +17,12 @@ export default function AddTodoForm() {
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Enter todo..."
+        disabled={!canAddMore}
       />
-      <button onClick={handleAdd}>Add</button>
+      <button onClick={handleAdd} disabled={!canAddMore}>
+        Add
+      </button>
+      <span className="task-counter">{activeCount}/5 active</span>
     </div>
   );
 }

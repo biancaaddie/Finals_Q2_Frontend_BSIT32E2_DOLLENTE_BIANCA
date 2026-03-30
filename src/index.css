@@ -158,3 +158,31 @@ button.delete {
 button.cancel {
   background: #777;
 }
+.warning-banner {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffe08a;
+  padding: 0.8rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+}
+
+.task-counter {
+  align-self: center;
+  font-size: 0.9rem;
+  color: #555;
+  white-space: nowrap;
+}
+
+.bonus-note {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+button:disabled,
+input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
